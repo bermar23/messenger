@@ -12,6 +12,7 @@ const conversations = new Map();
 const conversationMessages = new Map();
 const privateMessages = new Map();
 const userSockets = new Map(); // userId -> socketId
+const userCredentials = new Map(); // username -> {hashedPassword, salt}
 
 // Default public conversation
 const defaultConversation = {
@@ -28,6 +29,21 @@ conversations.set('public', defaultConversation);
 conversationMessages.set('public', []);
 
 console.log('Starting Project Messenger server...');
+
+// Simple password hashing (use bcrypt in production)
+function hashPassword(password, salt) {
+    const crypto = require('crypto');
+    return crypto.pbkdf2Sync(password, salt, 10000, 64, 'sha512').toString('hex');
+}
+
+function generateSalt() {
+    const crypto = require('crypto');
+    return crypto.randomBytes(32).toString('hex');
+}
+
+function verifyPassword(password, hashedPassword, salt) {
+    return hashPassword(password, salt) === hashedPassword;
+}
 
 // Health check endpoint
 app.get('/health', (req, res) => {
@@ -93,6 +109,20 @@ app.get('/', (req, res) => {
                            class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
                            placeholder="Enter your email">
                 </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-2">Security Code/Password</label>
+                    <input type="password" id="password" 
+                           class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                           placeholder="Enter your security code" required>
+                    <p id="password-hint" class="text-xs text-gray-500 mt-1">
+                        If this is your first time, create a new security code. Otherwise, enter your existing code.
+                    </p>
+                </div>
+                
+                <div class="flex items-center space-x-2">
+                    <input type="checkbox" id="is-new-user" class="rounded">
+                    <label for="is-new-user" class="text-sm text-gray-700">I'm a new user (create new security code)</label>
+                </div>
                 
                 <button type="submit" 
                         class="w-full bg-indigo-600 text-white py-2 px-4 rounded-md hover:bg-indigo-700 transition-colors">
@@ -145,6 +175,11 @@ app.get('/', (req, res) => {
                     </div>
                 </div>
                 <div class="flex items-center space-x-2">
+                    <button id="change-password-btn" 
+                            class="p-2 text-gray-500 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                            title="Change security code">
+                        🔐 Security
+                    </button>
                     <button id="clear-chat-btn" 
                             class="p-2 text-gray-500 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
                             title="Clear chat">
@@ -271,6 +306,43 @@ app.get('/', (req, res) => {
         </div>
     </div>
 
+    <!-- Change Password Modal -->
+    <div id="change-password-modal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50" style="display: none;">
+        <div class="bg-white rounded-lg p-6 w-96">
+            <h3 class="text-lg font-semibold mb-4">Change Security Code</h3>
+            <div class="space-y-4">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-2">Current Security Code</label>
+                    <input type="password" id="current-password" 
+                           class="w-full p-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                           placeholder="Enter current security code">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-2">New Security Code</label>
+                    <input type="password" id="new-password" 
+                           class="w-full p-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                           placeholder="Enter new security code">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-2">Confirm New Security Code</label>
+                    <input type="password" id="confirm-password" 
+                           class="w-full p-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                           placeholder="Confirm new security code">
+                </div>
+            </div>
+            <div class="flex space-x-2 mt-6">
+                <button id="change-password-confirm" 
+                        class="flex-1 bg-blue-500 text-white p-2 rounded hover:bg-blue-600 transition-colors">
+                    Change Security Code
+                </button>
+                <button id="change-password-cancel" 
+                        class="flex-1 bg-gray-300 text-gray-700 p-2 rounded hover:bg-gray-400 transition-colors">
+                    Cancel
+                </button>
+            </div>
+        </div>
+    </div>
+
     <script>
         // Global variables
         let socket;
@@ -318,6 +390,9 @@ app.get('/', (req, res) => {
             
             document.getElementById('logout-btn').addEventListener('click', logout);
             document.getElementById('clear-chat-btn').addEventListener('click', clearChat);
+            document.getElementById('change-password-btn').addEventListener('click', () => {
+                document.getElementById('change-password-modal').style.display = 'flex';
+            });
             
             // Modal handlers
             setupModalHandlers();
@@ -341,12 +416,21 @@ app.get('/', (req, res) => {
             document.getElementById('send-private-cancel').addEventListener('click', () => {
                 document.getElementById('private-modal').style.display = 'none';
             });
+            
+            // Change password modal
+            document.getElementById('change-password-confirm').addEventListener('click', changePassword);
+            document.getElementById('change-password-cancel').addEventListener('click', () => {
+                document.getElementById('change-password-modal').style.display = 'none';
+                clearPasswordFields();
+            });
         }
 
         function handleLogin(e) {
             e.preventDefault();
             const username = document.getElementById('username').value.trim();
             const email = document.getElementById('email').value.trim();
+            const password = document.getElementById('password').value;
+            const isNewUser = document.getElementById('is-new-user').checked;
             
             if (!username) {
                 alert('Username is required');
@@ -355,6 +439,16 @@ app.get('/', (req, res) => {
             
             if (username.length < 2) {
                 alert('Username must be at least 2 characters');
+                return;
+            }
+            
+            if (!password) {
+                alert('Security code is required');
+                return;
+            }
+            
+            if (password.length < 4) {
+                alert('Security code must be at least 4 characters');
                 return;
             }
             
@@ -367,22 +461,21 @@ app.get('/', (req, res) => {
                 isOnline: true
             };
             
-            // Initialize socket connection
+            // Send authentication request to server
+            const authData = {
+                username,
+                password,
+                isNewUser,
+                user: currentUser
+            };
+            
+            // Initialize socket connection first
             initSocket();
             
-            // Switch to chat interface
-            document.getElementById('login-section').style.display = 'none';
-            document.getElementById('chat-section').style.display = 'flex';
-            
-            // Join default conversation or invite
-            const urlParams = new URLSearchParams(window.location.search);
-            const inviteCode = urlParams.get('invite');
-            
-            if (inviteCode) {
-                joinByInviteCode(inviteCode);
-            } else {
-                joinConversation('public');
-            }
+            // Send authentication after socket is connected
+            socket.on('connect', () => {
+                socket.emit('user:authenticate', authData);
+            });
         }
 
         function generateUserId() {
@@ -394,6 +487,36 @@ app.get('/', (req, res) => {
             
             socket.on('connect', () => {
                 console.log('Connected to server');
+            });
+            
+            socket.on('auth:success', (data) => {
+                // Authentication successful, proceed to chat
+                document.getElementById('login-section').style.display = 'none';
+                document.getElementById('chat-section').style.display = 'flex';
+                
+                // Join default conversation or invite
+                const urlParams = new URLSearchParams(window.location.search);
+                const inviteCode = urlParams.get('invite');
+                
+                if (inviteCode) {
+                    joinByInviteCode(inviteCode);
+                } else {
+                    joinConversation('public');
+                }
+            });
+            
+            socket.on('auth:failed', (data) => {
+                alert('Authentication failed: ' + data.message);
+            });
+            
+            socket.on('password:changed', (data) => {
+                alert('Security code changed successfully!');
+                document.getElementById('change-password-modal').style.display = 'none';
+                clearPasswordFields();
+            });
+            
+            socket.on('password:change-failed', (data) => {
+                alert('Failed to change security code: ' + data.message);
             });
             
             socket.on('conversation:history', (data) => {
@@ -504,6 +627,38 @@ app.get('/', (req, res) => {
             if (!confirm('Are you sure you want to clear the chat? This action cannot be undone.')) return;
             
             socket.emit('conversation:clear', { conversationId: currentConversation.id });
+        }
+
+        function changePassword() {
+            const currentPassword = document.getElementById('current-password').value;
+            const newPassword = document.getElementById('new-password').value;
+            const confirmPassword = document.getElementById('confirm-password').value;
+            
+            if (!currentPassword || !newPassword || !confirmPassword) {
+                alert('All fields are required');
+                return;
+            }
+            
+            if (newPassword.length < 4) {
+                alert('New security code must be at least 4 characters');
+                return;
+            }
+            
+            if (newPassword !== confirmPassword) {
+                alert('New security codes do not match');
+                return;
+            }
+            
+            socket.emit('user:change-password', {
+                currentPassword,
+                newPassword
+            });
+        }
+        
+        function clearPasswordFields() {
+            document.getElementById('current-password').value = '';
+            document.getElementById('new-password').value = '';
+            document.getElementById('confirm-password').value = '';
         }
 
         function logout() {
@@ -683,9 +838,87 @@ const safeEmitToSocket = (socketId, event, data) => {
 io.on('connection', (socket) => {
     console.log('User connected:', socket.id);
 
+    // User authentication
+    socket.on('user:authenticate', (data) => {
+        const { username, password, isNewUser, user } = data;
+        
+        if (isNewUser) {
+            // Register new user
+            if (userCredentials.has(username)) {
+                socket.emit('auth:failed', { message: 'Username already exists. Please choose a different username or uncheck "I\'m a new user".' });
+                return;
+            }
+            
+            const salt = generateSalt();
+            const hashedPassword = hashPassword(password, salt);
+            userCredentials.set(username, { hashedPassword, salt });
+            
+            console.log('New user registered:', username);
+            socket.emit('auth:success', { message: 'Account created successfully!' });
+        } else {
+            // Login existing user
+            const credentials = userCredentials.get(username);
+            if (!credentials) {
+                socket.emit('auth:failed', { message: 'Username not found. Please check "I\'m a new user" if this is your first time.' });
+                return;
+            }
+            
+            if (!verifyPassword(password, credentials.hashedPassword, credentials.salt)) {
+                socket.emit('auth:failed', { message: 'Incorrect security code.' });
+                return;
+            }
+            
+            console.log('User authenticated:', username);
+            socket.emit('auth:success', { message: 'Login successful!' });
+        }
+        
+        // Store authenticated user
+        user.username = username; // Ensure username matches
+        user.isAuthenticated = true;
+        connectedUsers.set(socket.id, user);
+        userSockets.set(user.id, socket.id);
+    });
+
+    // Change password
+    socket.on('user:change-password', (data) => {
+        const user = connectedUsers.get(socket.id);
+        if (!user) {
+            socket.emit('password:change-failed', { message: 'User not authenticated' });
+            return;
+        }
+
+        const { currentPassword, newPassword } = data;
+        const credentials = userCredentials.get(user.username);
+        
+        if (!credentials) {
+            socket.emit('password:change-failed', { message: 'User credentials not found' });
+            return;
+        }
+        
+        if (!verifyPassword(currentPassword, credentials.hashedPassword, credentials.salt)) {
+            socket.emit('password:change-failed', { message: 'Current security code is incorrect' });
+            return;
+        }
+        
+        // Update password
+        const newSalt = generateSalt();
+        const newHashedPassword = hashPassword(newPassword, newSalt);
+        userCredentials.set(user.username, { hashedPassword: newHashedPassword, salt: newSalt });
+        
+        console.log('Password changed for user:', user.username);
+        socket.emit('password:changed', { message: 'Security code updated successfully' });
+    });
+
     // Join conversation
     socket.on('conversation:join', (data) => {
         const { conversationId, user } = data;
+        const authenticatedUser = connectedUsers.get(socket.id);
+        
+        if (!authenticatedUser || !authenticatedUser.isAuthenticated) {
+            socket.emit('error', { message: 'Please authenticate first' });
+            return;
+        }
+        
         const conversation = conversations.get(conversationId);
         
         if (!conversation) {
@@ -693,17 +926,20 @@ io.on('connection', (socket) => {
             return;
         }
 
-        // Store user and socket mapping
-        user.isOnline = true;
-        connectedUsers.set(socket.id, user);
-        userSockets.set(user.id, socket.id);
+        // Use the authenticated user instead of the passed user
+        const currentUser = authenticatedUser;
+        
+        // Store user and socket mapping (update existing)
+        currentUser.isOnline = true;
+        connectedUsers.set(socket.id, currentUser);
+        userSockets.set(currentUser.id, socket.id);
         
         // Join socket room
         socket.join(conversationId);
         
         // Add user to conversation participants
-        if (!conversation.participants.includes(user.id)) {
-            conversation.participants.push(user.id);
+        if (!conversation.participants.includes(currentUser.id)) {
+            conversation.participants.push(currentUser.id);
         }
 
         // Send conversation data
@@ -725,7 +961,7 @@ io.on('connection', (socket) => {
             id: uuidv4(),
             userId: 'system',
             username: 'System',
-            content: user.username + ' joined the conversation',
+            content: currentUser.username + ' joined the conversation',
             type: 'system',
             timestamp: new Date(),
             conversationId,
@@ -734,7 +970,7 @@ io.on('connection', (socket) => {
         messages.push(joinMessage);
         safeEmit(conversationId, 'message:new', joinMessage);
         
-        console.log('User ' + user.username + ' joined conversation ' + conversationId);
+        console.log('User ' + currentUser.username + ' joined conversation ' + conversationId);
     });
 
     // Send message to conversation
