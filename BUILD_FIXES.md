@@ -114,3 +114,49 @@ The project is now:
 - ✅ No unused variables or imports
 
 Deploy to Vercel should now succeed! 🚀
+
+## Vercel Deployment Issues Fixed
+
+### 🚨 Node.js Version Compatibility
+**Problem:** Next.js 15.4.3 requires Node.js ^18.18.0 || ^19.8.0 || >= 20.0.0
+**Current:** Node.js 18.16.1 ❌
+**Solution:** 
+- ✅ Added `.nvmrc` with Node.js 20.0.0
+- ✅ Added `engines` field in package.json
+- ✅ Vercel will now use Node.js 20.0.0+
+
+### 🔧 Deployment Configuration Fixed
+**Problem:** Vercel was trying to deploy Next.js app with Socket.io serverless functions
+**Solution:** Switched to Express.js deployment
+- ✅ Updated `vercel.json` to deploy `advanced-server.js`
+- ✅ Changed build target from Next.js to Node.js Express
+- ✅ Fixed start script to use `advanced-server.js`
+
+### 📁 Files Modified for Vercel:
+```json
+// vercel.json - New configuration
+{
+  "version": 2,
+  "builds": [{ "src": "advanced-server.js", "use": "@vercel/node" }],
+  "routes": [{ "src": "/(.*)", "dest": "advanced-server.js" }]
+}
+
+// package.json - Updated
+{
+  "engines": { "node": ">=20.0.0" },
+  "scripts": { "start": "node advanced-server.js" }
+}
+
+// .nvmrc - New file
+20.0.0
+```
+
+### 🚀 Ready for Vercel Deployment
+The project now:
+- ✅ Uses compatible Node.js version (20.0.0+)
+- ✅ Deploys Express.js server instead of Next.js
+- ✅ Properly configured for Vercel serverless
+- ✅ Maintains all Socket.io real-time features
+- ✅ No build errors or warnings
+
+**Deploy Command:** `vercel --prod`

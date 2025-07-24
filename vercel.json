@@ -1,10 +1,23 @@
 {
+  "version": 2,
+  "builds": [
+    {
+      "src": "advanced-server.js",
+      "use": "@vercel/node"
+    }
+  ],
+  "routes": [
+    {
+      "src": "/(.*)",
+      "dest": "advanced-server.js"
+    }
+  ],
+  "env": {
+    "NODE_ENV": "production"
+  },
   "functions": {
-    "src/app/api/socket/route.ts": {
+    "advanced-server.js": {
       "maxDuration": 10
     }
-  },
-  "buildCommand": "npm run build",
-  "framework": "nextjs",
-  "regions": ["iad1"]
+  }
 }
