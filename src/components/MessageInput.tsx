@@ -31,7 +31,12 @@ export function MessageInput() {
   const handleKeyPress = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
-      handleSubmit(e as any);
+      
+      if (!message.trim() || !isConnected) return;
+      
+      sendMessage(message.trim());
+      setMessage('');
+      setShowEmojiPicker(false);
     }
   };
 

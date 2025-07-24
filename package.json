@@ -10,7 +10,9 @@
     "server": "node server.js",
     "dev:full": "concurrently \"npm run server\" \"npm run dev\"",
     "standalone": "node standalone-server.js",
-    "simple": "node simple-server.js"
+    "simple": "node simple-server.js",
+    "check": "./check-build.sh",
+    "type-check": "tsc --noEmit"
   },
   "dependencies": {
     "@types/uuid": "^10.0.0",

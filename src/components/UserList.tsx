@@ -2,9 +2,13 @@
 
 import React from 'react';
 import { useChat } from '@/context/ChatContext';
-import { Users, MapPin, Clock } from 'lucide-react';
+import { Users, MapPin, Clock, MessageCircle } from 'lucide-react';
 
-export function UserList() {
+interface UserListProps {
+  onPrivateMessage?: (userId: string, username: string) => void;
+}
+
+export function UserList({ onPrivateMessage }: UserListProps) {
   const { users, currentUser } = useChat();
 
   const formatJoinTime = (date: Date) => {
@@ -15,69 +19,75 @@ export function UserList() {
     }).format(new Date(date));
   };
 
+  const handlePrivateMessage = (userId: string, username: string) => {
+    if (onPrivateMessage && userId !== currentUser?.id) {
+      onPrivateMessage(userId, username);
+    }
+  };
+
   return (
-    <div className="bg-gray-50 border-l border-gray-200 w-64 flex flex-col">
-      <div className="p-4 border-b border-gray-200 bg-white">
-        <div className="flex items-center space-x-2">
-          <Users size={20} className="text-gray-600" />
-          <h3 className="font-semibold text-gray-900">
-            Online Users ({users.length})
-          </h3>
+    <div className="flex-1 overflow-y-auto">
+      {users.length === 0 ? (
+        <div className="p-4 text-center text-gray-500">
+          <Users size={32} className="mx-auto mb-2 opacity-50" />
+          <p className="text-sm">No participants</p>
         </div>
-      </div>
-      
-      <div className="flex-1 overflow-y-auto p-4 space-y-3">
-        {users.length === 0 ? (
-          <div className="text-center text-gray-500 text-sm">
-            No users online
-          </div>
-        ) : (
-          users.map((user) => (
-            <div
-              key={user.id}
-              className={`p-3 rounded-lg border ${
-                user.id === currentUser?.id
-                  ? 'bg-indigo-50 border-indigo-200'
-                  : 'bg-white border-gray-200'
-              }`}
-            >
-              <div className="flex items-center space-x-2 mb-2">
-                <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-                <span className="font-medium text-gray-900 text-sm">
-                  {user.username}
-                  {user.id === currentUser?.id && (
-                    <span className="ml-1 text-indigo-600">(You)</span>
+      ) : (
+        <div className="space-y-2 p-2">
+          {users.map((user) => {
+            const isCurrentUser = user.id === currentUser?.id;
+            return (
+              <div
+                key={user.id}
+                className={`p-3 rounded-lg transition-colors ${
+                  isCurrentUser 
+                    ? 'bg-indigo-50 border border-indigo-200' 
+                    : 'bg-gray-50 hover:bg-gray-100'
+                }`}
+              >
+                <div className="flex items-center justify-between">
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center space-x-2">
+                      <div className={`w-2 h-2 rounded-full ${
+                        user.isOnline ? 'bg-green-500' : 'bg-gray-400'
+                      }`} />
+                      <p className={`font-medium text-sm truncate ${
+                        isCurrentUser ? 'text-indigo-900' : 'text-gray-900'
+                      }`}>
+                        {user.username}{isCurrentUser ? ' (You)' : ''}
+                      </p>
+                    </div>
+                    
+                    {user.location && (
+                      <div className="flex items-center space-x-1 mt-1">
+                        <MapPin size={12} className="text-gray-400" />
+                        <p className="text-xs text-gray-500 truncate">{user.location}</p>
+                      </div>
+                    )}
+                    
+                    <div className="flex items-center space-x-1 mt-1">
+                      <Clock size={12} className="text-gray-400" />
+                      <p className="text-xs text-gray-500">
+                        Joined {formatJoinTime(user.joinedAt)}
+                      </p>
+                    </div>
+                  </div>
+                  
+                  {!isCurrentUser && onPrivateMessage && (
+                    <button
+                      onClick={() => handlePrivateMessage(user.id, user.username)}
+                      className="p-1 text-gray-400 hover:text-purple-600 hover:bg-purple-50 rounded transition-colors"
+                      title="Send private message"
+                    >
+                      <MessageCircle size={16} />
+                    </button>
                   )}
-                </span>
+                </div>
               </div>
-              
-              {user.email && (
-                <div className="text-xs text-gray-600 mb-1 truncate">
-                  {user.email}
-                </div>
-              )}
-              
-              {user.location && (
-                <div className="flex items-center space-x-1 text-xs text-gray-500 mb-1">
-                  <MapPin size={12} />
-                  <span className="truncate">{user.location}</span>
-                </div>
-              )}
-              
-              <div className="flex items-center space-x-1 text-xs text-gray-500">
-                <Clock size={12} />
-                <span>Joined {formatJoinTime(user.joinedAt)}</span>
-              </div>
-              
-              {user.ipAddress && user.ipAddress !== 'localhost' && (
-                <div className="text-xs text-gray-400 mt-1 font-mono">
-                  {user.ipAddress}
-                </div>
-              )}
-            </div>
-          ))
-        )}
-      </div>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 }
