@@ -55,6 +55,108 @@ app.get('/health', (req, res) => {
     });
 });
 
+// REST API endpoints for fallback when Socket.io isn't working
+app.use(express.json());
+
+// Get messages for a conversation
+app.get('/api/messages/:conversationId', (req, res) => {
+    const { conversationId } = req.params;
+    const { since } = req.query;
+    
+    let messages = conversationMessages.get(conversationId) || [];
+    
+    if (since) {
+        const sinceTime = new Date(since);
+        messages = messages.filter(msg => new Date(msg.timestamp) > sinceTime);
+    }
+    
+    res.json({ messages, timestamp: new Date().toISOString() });
+});
+
+// Send a message via REST API
+app.post('/api/messages/:conversationId', (req, res) => {
+    const { conversationId } = req.params;
+    const { userId, text, username } = req.body;
+    
+    if (!text || !userId || !username) {
+        return res.status(400).json({ error: 'Missing required fields' });
+    }
+    
+    const message = {
+        id: uuidv4(),
+        userId,
+        username,
+        text,
+        timestamp: new Date(),
+        conversationId
+    };
+    
+    // Store message
+    if (!conversationMessages.has(conversationId)) {
+        conversationMessages.set(conversationId, []);
+    }
+    
+    const messages = conversationMessages.get(conversationId);
+    messages.push(message);
+    
+    // Keep only last 1000 messages
+    if (messages.length > 1000) {
+        messages.splice(0, messages.length - 1000);
+    }
+    
+    // Try to emit via Socket.io if available
+    try {
+        io?.to(conversationId).emit('message', message);
+    } catch (error) {
+        console.log('Socket.io not available, message saved for polling');
+    }
+    
+    res.json({ success: true, message });
+});
+
+// Get online users
+app.get('/api/users', (req, res) => {
+    const users = Array.from(connectedUsers.values());
+    res.json({ users, timestamp: new Date().toISOString() });
+});
+
+// Long polling endpoint for real-time updates
+app.get('/api/poll/:conversationId', (req, res) => {
+    const { conversationId } = req.params;
+    const { since } = req.query;
+    
+    // Set timeout for long polling
+    const timeout = setTimeout(() => {
+        res.json({ messages: [], timestamp: new Date().toISOString() });
+    }, 30000); // 30 second timeout
+    
+    // Check for new messages immediately
+    let messages = conversationMessages.get(conversationId) || [];
+    if (since) {
+        const sinceTime = new Date(since);
+        messages = messages.filter(msg => new Date(msg.timestamp) > sinceTime);
+    }
+    
+    if (messages.length > 0) {
+        clearTimeout(timeout);
+        return res.json({ messages, timestamp: new Date().toISOString() });
+    }
+    
+    // Store the response object for later use
+    if (!global.pollingClients) {
+        global.pollingClients = new Map();
+    }
+    
+    const clientId = uuidv4();
+    global.pollingClients.set(clientId, { res, conversationId, since: since || new Date().toISOString() });
+    
+    // Clean up when client disconnects
+    req.on('close', () => {
+        clearTimeout(timeout);
+        global.pollingClients?.delete(clientId);
+    });
+});
+
 // Main chat page with all advanced features
 app.get('/', (req, res) => {
     const inviteCode = req.query.invite || '';
@@ -815,17 +917,57 @@ app.get('/', (req, res) => {
 
 // Create HTTP server and Socket.io
 const server = createServer(app);
+
+// Socket.io configuration optimized for serverless environments like Vercel
 const io = new Server(server, {
     cors: {
-        origin: "*",
-        methods: ["GET", "POST"]
-    }
+        origin: process.env.SOCKET_IO_CORS_ORIGIN || 
+                (process.env.NODE_ENV === 'production' 
+                    ? ["https://*.vercel.app"] 
+                    : "*"),
+        methods: ["GET", "POST"],
+        credentials: true
+    },
+    // Configure transport methods for better Vercel compatibility
+    transports: ['polling', 'websocket'],
+    // Force polling first, then upgrade to websocket if available
+    upgrade: true,
+    // Increase timeout for serverless environments
+    pingTimeout: 60000,
+    pingInterval: 25000,
+    // Additional configuration for production
+    allowEIO3: true,
+    cookie: process.env.NODE_ENV === 'production' ? {
+        name: "io",
+        httpOnly: true,
+        sameSite: "strict",
+        secure: true
+    } : false
 });
 
-// Helper function to safely emit to rooms
+// Helper function to safely emit to rooms and notify long-polling clients
 const safeEmit = (room, event, data) => {
+    // Emit via Socket.io if available
     if (io) {
         io.to(room).emit(event, data);
+    }
+    
+    // Notify long-polling clients for message events
+    if (event === 'message:new' && global.pollingClients) {
+        for (const [clientId, client] of global.pollingClients.entries()) {
+            if (client.conversationId === room) {
+                try {
+                    client.res.json({ 
+                        messages: [data], 
+                        timestamp: new Date().toISOString() 
+                    });
+                    global.pollingClients.delete(clientId);
+                } catch (error) {
+                    // Client likely disconnected
+                    global.pollingClients.delete(clientId);
+                }
+            }
+        }
     }
 };
 

@@ -1,5 +1,8 @@
 import { io, Socket } from 'socket.io-client';
 
+// Note: For production deployment on Vercel, consider using hybrid-socket.ts
+// which includes HTTP polling fallback for better serverless compatibility
+
 class SocketManager {
   private socket: Socket | null = null;
   private isConnected = false;
@@ -12,13 +15,29 @@ class SocketManager {
     // Use environment variable or default to same origin
     const url = serverUrl || process.env.NEXT_PUBLIC_SOCKET_URL || window.location.origin;
     
+    // Configuration optimized for serverless environments like Vercel
     this.socket = io(url, {
-      transports: ['websocket', 'polling'],
+      // Prioritize polling for better serverless compatibility
+      transports: ['polling', 'websocket'],
+      // Disable automatic WebSocket upgrade initially
+      upgrade: false,
       autoConnect: true,
       reconnection: true,
-      reconnectionAttempts: 5,
+      reconnectionAttempts: 10,
       reconnectionDelay: 1000,
-      timeout: 10000,
+      reconnectionDelayMax: 5000,
+      timeout: 20000,
+      // Additional options for production
+      forceNew: false,
+      multiplex: true,
+      // Increase polling frequency for better real-time feel
+      ...(process.env.NODE_ENV === 'production' ? {
+        transports: ['polling'], // Force polling in production
+        upgrade: false, // Disable WebSocket upgrade in production
+        rememberUpgrade: false,
+        timeout: 30000,
+        reconnectionAttempts: 15,
+      } : {})
     });
 
     this.socket.on('connect', () => {
