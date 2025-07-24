@@ -134,11 +134,16 @@ Deploy to Vercel should now succeed! 🚀
 
 ### 📁 Files Modified for Vercel:
 ```json
-// vercel.json - New configuration
+// vercel.json - Fixed configuration (removed conflicting functions property)
 {
   "version": 2,
-  "builds": [{ "src": "advanced-server.js", "use": "@vercel/node" }],
-  "routes": [{ "src": "/(.*)", "dest": "advanced-server.js" }]
+  "builds": [{ 
+    "src": "advanced-server.js", 
+    "use": "@vercel/node",
+    "config": { "maxLambdaSize": "50mb" }
+  }],
+  "routes": [{ "src": "/(.*)", "dest": "advanced-server.js" }],
+  "env": { "NODE_ENV": "production" }
 }
 
 // package.json - Updated
@@ -150,6 +155,10 @@ Deploy to Vercel should now succeed! 🚀
 // .nvmrc - New file
 20.0.0
 ```
+
+### ⚠️ Vercel Configuration Error Fixed
+**❌ Error:** "The `functions` property cannot be used in conjunction with the `builds` property"
+**✅ Solution:** Removed conflicting `functions` property, moved config to `builds.config`
 
 ### 🚀 Ready for Vercel Deployment
 The project now:

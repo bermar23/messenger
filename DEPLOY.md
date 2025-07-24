@@ -52,12 +52,17 @@ PORT=3000
 - ✅ **Fixed:** `.nvmrc` specifies Node.js 20.0.0
 - ✅ **Fixed:** `package.json` engines field updated
 
+#### Vercel Configuration Error
+- ❌ **Error:** "functions property cannot be used with builds property"
+- ✅ **Fixed:** Removed conflicting `functions` property from vercel.json
+- ✅ **Fixed:** Moved Lambda configuration to `builds.config`
+
 #### Socket.io Not Working
 - ✅ **Fixed:** Using Express.js deployment instead of Next.js
 - ✅ **Fixed:** Proper routing configuration in `vercel.json`
 
 #### Functions Timeout
-- ✅ **Fixed:** 10-second timeout configured
+- ✅ **Fixed:** Lambda size limit increased to 50mb
 - ✅ **Fixed:** Optimized for serverless deployment
 
 ### 🌐 After Deployment
