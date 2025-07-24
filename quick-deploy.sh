@@ -1,9 +1,9 @@
 #!/bin/bash
 
-# Vercel Deployment Script with WebSocket Fix
-# This script deploys the messaging app to Vercel with optimized configuration
+# Quick Vercel Deployment (Skip Local Testing)
+# Use this if the main deploy-vercel.sh has issues with local testing
 
-echo "🚀 Deploying Simple Secure Messenger to Vercel with WebSocket fix..."
+echo "🚀 Quick Deploy to Vercel (skipping local tests)..."
 
 # Check if vercel CLI is installed
 if ! command -v vercel &> /dev/null; then
@@ -11,51 +11,9 @@ if ! command -v vercel &> /dev/null; then
     exit 1
 fi
 
-# Ensure we're using the standalone server
-echo "✅ Using advanced-server.js (standalone Express + Socket.io)"
-
-# Check if production dependencies are installed
-echo "📦 Checking dependencies..."
-npm list express socket.io uuid > /dev/null 2>&1
-if [ $? -ne 0 ]; then
-    echo "⚠️  Installing missing dependencies..."
-    npm install express socket.io uuid
-fi
-
-# Clean up any existing processes on port 3000
-echo "🧹 Cleaning up port 3000..."
-pkill -f "node advanced-server.js" 2>/dev/null || true
-lsof -ti:3000 | xargs kill -9 2>/dev/null || true
-sleep 1
-
-# Validate server can start
-echo "🧪 Testing server locally..."
-NODE_ENV=production node advanced-server.js > /tmp/server-test.log 2>&1 &
-SERVER_PID=$!
-sleep 3
-
-# Test health endpoint with retries
-HEALTH_CHECK_PASSED=false
-for i in {1..5}; do
-    if curl -s --connect-timeout 2 http://localhost:3000/health > /dev/null 2>&1; then
-        echo "✅ Local server test passed (attempt $i)"
-        HEALTH_CHECK_PASSED=true
-        break
-    fi
-    echo "⏳ Waiting for server to start (attempt $i/5)..."
-    sleep 2
-done
-
-# Clean up test server
-kill $SERVER_PID 2>/dev/null || true
-sleep 1
-
-if [ "$HEALTH_CHECK_PASSED" = false ]; then
-    echo "❌ Local server test failed. Server logs:"
-    cat /tmp/server-test.log | tail -10
-    echo ""
-    echo "🔧 Continuing with deployment anyway (server might work in Vercel environment)"
-fi
+# Ensure dependencies are installed
+echo "📦 Installing dependencies..."
+npm install express socket.io uuid
 
 # Get the app name from user
 read -p "📝 Enter your Vercel app name (or press Enter for auto-generated): " APP_NAME
