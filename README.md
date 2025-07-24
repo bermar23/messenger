@@ -1,36 +1,124 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Project Messenger
+
+A real-time web-based messaging application built with Next.js, TypeScript, and Socket.io.
+
+## Features
+
+- **Simple Authentication**: Join with just a username or email
+- **Real-time Messaging**: Instant communication using Socket.io
+- **IP Address & Location Detection**: Automatically detects user location
+- **Message Formatting**: Support for text messages and emoticons
+- **Local Network Compatible**: Works seamlessly on local networks
+- **Vercel Deployable**: Optimized for easy deployment on Vercel
+- **Responsive Design**: Beautiful UI that works on all devices
+
+## Technology Stack
+
+- **Frontend**: Next.js 15 with TypeScript
+- **Styling**: Tailwind CSS
+- **Real-time Communication**: Socket.io
+- **State Management**: React Context & Hooks
+- **Icons**: Lucide React
+- **Emojis**: Emoji Picker React
 
 ## Getting Started
 
-First, run the development server:
+### Prerequisites
 
+- Node.js 18.18.0 or higher
+- npm or yarn
+
+### Installation
+
+1. Clone the repository:
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+git clone <repository-url>
+cd project-messenger
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+2. Install dependencies:
+```bash
+npm install
+```
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+3. Start the development servers:
+```bash
+npm run dev:full
+```
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+This will start both the Next.js frontend (port 3000) and Socket.io server (port 3001).
 
-## Learn More
+### Individual Commands
 
-To learn more about Next.js, take a look at the following resources:
+- **Frontend only**: `npm run dev`
+- **Socket.io server only**: `npm run server`
+- **Build for production**: `npm run build`
+- **Start production**: `npm start`
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## Usage
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+1. Open your browser and go to `http://localhost:3000`
+2. Enter a username (email is optional)
+3. Start chatting in real-time!
 
-## Deploy on Vercel
+## Local Network Access
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+To use on your local network:
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+1. Find your local IP address
+2. Access the app at `http://[YOUR_IP]:3000`
+3. Update the `NEXT_PUBLIC_SOCKET_URL` in `.env.local` to include your IP
+
+## Environment Variables
+
+Create a `.env.local` file in the root directory:
+
+```env
+# Socket.io server URL (leave empty for same origin in production)
+NEXT_PUBLIC_SOCKET_URL=http://localhost:3001
+
+# Socket.io server port
+SOCKET_PORT=3001
+```
+
+## Deployment
+
+### Vercel Deployment
+
+1. Push your code to a Git repository
+2. Connect your repository to Vercel
+3. Add environment variables in Vercel dashboard
+4. Deploy!
+
+For the Socket.io server, you may need to deploy it separately on a service like Railway, Render, or Heroku.
+
+## Project Structure
+
+```
+src/
+├── app/                 # Next.js App Router pages
+├── components/          # React components
+├── context/            # React Context providers
+├── lib/                # Utility functions and configurations
+└── types/              # TypeScript type definitions
+```
+
+## Contributing
+
+1. Fork the repository
+2. Create a feature branch
+3. Make your changes
+4. Test thoroughly
+5. Submit a pull request
+
+## License
+
+This project is licensed under the MIT License.
+
+## Version
+
+**Current Version**: 1.0.0
+
+---
+
+Built with ❤️ using Next.js and Socket.io
