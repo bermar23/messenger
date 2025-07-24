@@ -92,6 +92,39 @@ SOCKET_PORT=3001
 
 For the Socket.io server, you may need to deploy it separately on a service like Railway, Render, or Heroku.
 
+## Deployment on Vercel
+
+### Prerequisites
+- Node.js version 18.18.0 or higher (required for Next.js 15)
+- Vercel account
+
+### Deploy Steps
+
+1. **Push your code to GitHub**:
+   ```bash
+   git add .
+   git commit -m "Add Project Messenger"
+   git push origin main
+   ```
+
+2. **Connect to Vercel**:
+   - Go to [vercel.com](https://vercel.com)
+   - Import your GitHub repository
+   - Vercel will automatically detect it's a Next.js project
+
+3. **Environment Variables** (optional):
+   - In Vercel dashboard, go to Settings → Environment Variables
+   - Add `NEXT_PUBLIC_SOCKET_URL` (leave empty for same-origin Socket.io)
+
+4. **Deploy**:
+   - Vercel will automatically build and deploy
+   - Your app will be available at `https://your-project.vercel.app`
+
+### TypeScript Fixes Applied
+- Replaced `any` types with proper interfaces (`User`, `Message`)
+- Added strict TypeScript typing for Socket.io handlers
+- Ensured compatibility with Vercel's build process
+
 ## Project Structure
 
 ```

@@ -2,10 +2,11 @@ import { NextRequest } from 'next/server';
 import { Server as HttpServer, createServer } from 'http';
 import { Server as SocketIOServer } from 'socket.io';
 import { v4 as uuidv4 } from 'uuid';
+import { User, Message } from '@/types';
 
 // In-memory storage (use Redis or database in production)
-const connectedUsers = new Map<string, any>();
-const chatMessages: any[] = [];
+const connectedUsers = new Map<string, User>();
+const chatMessages: Message[] = [];
 
 let io: SocketIOServer | null = null;
 let httpServer: HttpServer | null = null;
@@ -40,12 +41,12 @@ function initializeSocket() {
       io?.emit('users:list', Array.from(connectedUsers.values()));
       
       // Send join message
-      const joinMessage = {
+      const joinMessage: Message = {
         id: uuidv4(),
         userId: 'system',
         username: 'System',
         content: `${user.username} joined the chat`,
-        type: 'text',
+        type: 'text' as const,
         timestamp: new Date(),
       };
       
@@ -84,12 +85,12 @@ function initializeSocket() {
         io?.emit('users:list', Array.from(connectedUsers.values()));
         
         // Send leave message
-        const leaveMessage = {
+        const leaveMessage: Message = {
           id: uuidv4(),
           userId: 'system',
           username: 'System',
           content: `${user.username} left the chat`,
-          type: 'text',
+          type: 'text' as const,
           timestamp: new Date(),
         };
         
@@ -109,12 +110,12 @@ function initializeSocket() {
         io?.emit('users:list', Array.from(connectedUsers.values()));
         
         // Send disconnect message
-        const disconnectMessage = {
+        const disconnectMessage: Message = {
           id: uuidv4(),
           userId: 'system',
           username: 'System',
           content: `${user.username} disconnected`,
-          type: 'text',
+          type: 'text' as const,
           timestamp: new Date(),
         };
         
